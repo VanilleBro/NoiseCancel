@@ -1,0 +1,65 @@
+plugins {
+    id 'com.android.application'
+}
+
+def runNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
+
+android {
+    namespace 'com.vanillebro.noisecancel'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.vanillebro.noisecancel'
+        minSdk 28
+        targetSdk 34
+        versionCode runNumber
+        versionName "1.0.${runNumber}"
+
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+        }
+        externalNativeBuild {
+            cmake {
+                cppFlags '-std=c++17'
+                arguments '-DANDROID_STL=c++_static'
+            }
+        }
+    }
+
+    // Fester Signaturschlüssel, damit neue Builds als Update installiert werden können.
+    // (Nur für privates Sideloading gedacht – kein Geheimnis.)
+    signingConfigs {
+        shared {
+            storeFile file('noisecancel.jks')
+            storePassword 'noisecancel'
+            keyAlias 'noisecancel'
+            keyPassword 'noisecancel'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.shared
+        }
+        debug {
+            signingConfig signingConfigs.shared
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path file('src/main/cpp/CMakeLists.txt')
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}

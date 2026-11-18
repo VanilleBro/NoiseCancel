@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NoiseCancel</string>
+    <string name="subtitle">Aktive Geräuschunterdrückung</string>
+
+    <string name="btn_start">Starten</string>
+    <string name="btn_stop">Stoppen</string>
+
+    <string name="state_off">Aus. Tippe auf Starten – läuft danach auch im Hintergrund weiter.</string>
+    <string name="state_error">Fehler: %1$s</string>
+    <string name="state_restarting">Audiogerät gewechselt – starte neu …</string>
+    <string name="state_quiet">Aktiv – es ist gerade sehr leise.</string>
+    <string name="state_unpredictable">Aktiv – Geräusch ist kaum vorhersagbar (Stimmen, Rauschen). Hier ist kaum Dämpfung möglich.</string>
+    <string name="state_active">Aktiv – gleichmäßiges Geräusch erkannt, Gegenschall läuft.</string>
+
+    <string name="route_wired">Kabelkopfhörer erkannt – beste Bedingungen.</string>
+    <string name="route_bt">Bluetooth-Kopfhörer: hohe Funk-Latenz. Wirkt nur bei sehr gleichmäßigen Tönen – Kabel ist deutlich besser.</string>
+    <string name="route_speaker">Kein Kopfhörer: Über den Lautsprecher wirkt Gegenschall nur an einem Punkt im Raum und kann rückkoppeln. Bitte Kopfhörer anschließen.</string>
+
+    <string name="gain_title">Stärke</string>
+    <string name="gain_off">Aus</string>
+    <string name="gain_value">%1$d %% · %2$+.1f dB</string>
+    <string name="gain_hint">Lautstärke des Gegenschalls. Erhöhe sie langsam, bis das Brummen am leisesten ist. Zu viel macht es wieder lauter. Auch die Medienlautstärke des Handys wirkt mit.</string>
+
+    <string name="offset_title">Feinabstimmung Phase</string>
+    <string name="offset_value">%1$+.1f ms</string>
+    <string name="offset_hint">Gleicht Laufzeiten aus, die das Handy nicht messen kann (Wandler, Abstand Mikrofon–Ohr). In kleinen Schritten verschieben und auf das leiseste Ergebnis achten.</string>
+    <string name="offset_zero">Auf 0</string>
+
+    <string name="analysis_title">Analyse</string>
+    <string name="row_input">Mikrofonpegel (unter 1 kHz)</string>
+    <string name="row_pred">Vorhersagbarer Anteil</string>
+    <string name="row_red">Theoretisch mögliche Dämpfung</string>
+    <string name="row_latency">Audio-Latenz</string>
+    <string name="row_path">Audiopfad</string>
+    <string name="row_out">Gegenschall-Pegel</string>
+    <string name="row_events">Ereignisse</string>
+    <string name="dash">–</string>
+    <string name="percent_value">%1$d %%</string>
+    <string name="reduction_value">bis zu %1$.0f dB</string>
+    <string name="latency_measured">%1$.1f ms gemessen · Vorhersage %2$.1f ms</string>
+    <string name="latency_estimated">%1$.1f ms geschätzt · Vorhersage %2$.1f ms</string>
+    <string name="path_exclusive">Exklusiv (MMAP)</string>
+    <string name="path_shared">Geteilt</string>
+    <string name="path_no_lowlat">ohne Low-Latency</string>
+    <string name="path_value">%1$s · %2$d Hz</string>
+    <string name="events_value">Rückkopplungen: %1$d · Aussetzer: %2$d</string>
+    <string name="relearn">Filter neu lernen</string>
+    <string name="relearn_toast">Filter zurückgesetzt – lernt neu</string>
+
+    <string name="how_title">So funktioniert es</string>
+    <string name="how_text">Das Mikrofon nimmt das Umgebungsgeräusch auf. Ein adaptiver Filter (NLMS) lernt dessen gleichmäßige Anteile und sagt sie genau um die gemessene Audio-Latenz des Handys voraus. Diese Vorhersage wird gegenphasig (um 180° gedreht) über den Kopfhörer abgespielt, sodass sich Schall und Gegenschall am Ohr gegenseitig auslöschen.\n\nGut wirkt das bei gleichmäßigen, tiefen Geräuschen unter etwa 900 Hz: Lüfter, Klimaanlage, Motoren, Kühlschrank, Netzbrummen, Fahrgeräusche. Stimmen, Klappern oder Rauschen sind nicht vorhersagbar – dafür gibt die App automatisch keinen Gegenschall aus.\n\nTipps: Kabelkopfhörer nutzen, Handy ruhig halten, Mikrofon nicht abdecken. Bei plötzlicher Rückkopplung schaltet sich der Gegenschall kurz stumm und lernt neu.</string>
+
+    <string name="need_mic">Ohne Mikrofon-Berechtigung kann die App nicht arbeiten.</string>
+    <string name="err_foreground">Dienst konnte nicht starten: %1$s</string>
+    <string name="err_audio_unknown">Audio konnte nicht gestartet werden.</string>
+
+    <string name="notif_channel">Geräuschunterdrückung</string>
+    <string name="notif_channel_desc">Zeigt an, dass die Geräuschunterdrückung läuft.</string>
+    <string name="notif_title">Geräuschunterdrückung aktiv</string>
+    <string name="notif_text">Stärke %1$d %% · Tippen zum Öffnen</string>
+    <string name="notif_stop">Ausschalten</string>
+</resources>

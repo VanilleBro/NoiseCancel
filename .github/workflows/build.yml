@@ -1,0 +1,60 @@
+name: Android APK bauen
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: DSP-Simulation (Funktionstest des Algorithmus)
+        run: |
+          g++ -O2 -std=c++17 test/sim.cpp -o sim
+          {
+            echo "**Installation:** NoiseCancel.apk unten herunterladen, öffnen und Installation aus unbekannter Quelle erlauben."
+            echo
+            echo "Simulierte Dämpfung des DSP-Kerns in diesem Build:"
+            echo '```'
+            ./sim
+            echo '```'
+          } | tee notes.md
+
+      - name: APK bauen
+        run: gradle --no-daemon assembleRelease --stacktrace
+
+      - name: APK umbenennen
+        run: cp app/build/outputs/apk/release/app-release.apk NoiseCancel.apk
+
+      - name: APK als Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: NoiseCancel-apk
+          path: NoiseCancel.apk
+
+      - name: Release mit APK erstellen
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: NoiseCancel 1.0.${{ github.run_number }}
+          make_latest: true
+          body_path: notes.md
+          files: NoiseCancel.apk
