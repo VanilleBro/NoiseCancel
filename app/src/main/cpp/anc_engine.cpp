@@ -96,7 +96,7 @@ public:
         v[11] = dsp_.statHorizonMs();
         v[12] = dsp_.statGainApplied();
         v[13] = restarting_.load() ? 1.f : 0.f;
-        v[14] = (float)outBufferFrames_.load();
+        v[14] = dsp_.statConfGate();
         v[15] = lowLatency_.load() ? 1.f : 0.f;
         for (int i = 0; i < n && i < 16; ++i) o[i] = v[i];
     }

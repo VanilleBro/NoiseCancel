@@ -72,6 +72,10 @@ public:
         aSlow_ = (float)(1.0 - std::exp(-1.0 / (8.0 * fsd_)));
         aTrack_ = (float)(1.0 - std::exp(-1.0 / (0.2 * fsd_)));
         aStat_ = (float)(1.0 - std::exp(-1.0 / (1.0 * fsd_)));
+        aShort_ = (float)(1.0 - std::exp(-1.0 / (0.08 * fsd_)));
+        aMid_ = (float)(1.0 - std::exp(-1.0 / (2.0 * fsd_)));
+        aGateDown_ = (float)(1.0 - std::exp(-1.0 / (0.015 * fsd_)));
+        aGateUp_ = (float)(1.0 - std::exp(-1.0 / (0.6 * fsd_)));
         warmupSamples_ = (int)(1.0 * fsd_);
         resetState();
     }
@@ -90,6 +94,7 @@ public:
     float statReductionDb() const { return sRedDb_.load(std::memory_order_relaxed); }
     float statHorizonMs() const { return sHorizonMs_.load(std::memory_order_relaxed); }
     float statGainApplied() const { return sGain_.load(std::memory_order_relaxed); }
+    float statConfGate() const { return sGate_.load(std::memory_order_relaxed); }
     int statFeedbackEvents() const { return sFeedback_.load(std::memory_order_relaxed); }
     int sampleRate() const { return fs_; }
     int decimation() const { return R_; }
@@ -130,6 +135,7 @@ private:
         gTargetLocal_ = gainTarget_.load(std::memory_order_relaxed);
         inFast_ = inSlow_ = outFast_ = 0.f;
         px_ = pe_ = 1e-12f;
+        pxS_ = peS_ = 1e-12f; inMid_ = 0.f; ydPow_ = 0.f; conf_ = 0.f; confGate_ = 0.f;
         warm_ = 0; muteCount_ = 0;
         Qcur_ = -1;
         updateHorizon();
@@ -222,6 +228,7 @@ private:
 
         const float z2 = z * z;
         inFast_ += (z2 - inFast_) * aFast_;
+        inMid_ += (z2 - inMid_) * aMid_;
         if (warm_ < warmupSamples_) {
             ++warm_;
             inSlow_ = inFast_;
@@ -249,6 +256,8 @@ private:
             }
             px_ += (z2 - px_) * aStat_;
             pe_ += (e * e - pe_) * aStat_;
+            pxS_ += (z2 - pxS_) * aShort_;
+            peS_ += (e * e - peS_) * aShort_;
 
             // Vorhersage von xd[m+H]
             float y = 0.f;
@@ -257,7 +266,22 @@ private:
                 resetWeights();
                 y = 0.f;
             }
-            yd = y;
+            // ---- Schutz gegen "lauter statt leiser" ----
+            // 1) Kurzzeit-Vorhersagegüte: Gegenschall nur, wenn die Vorhersage von vor
+            //    H Samples das JETZIGE Geräusch wirklich getroffen hat.
+            conf_ = 1.f - peS_ / std::max(pxS_, 1e-12f);
+            float target = (conf_ - kConfLow) / (kConfHigh - kConfLow);
+            // 2) Stationarität: ändert sich der Pegel schnell (Auto nähert sich, Tür,
+            //    Stimme), ändert sich auch die Schallrichtung -> Phase am Ohr unbekannt.
+            const float ratio = (inFast_ + 1e-12f) / (inMid_ + 1e-12f);
+            if (ratio > kStatRatio || ratio < 1.f / kStatRatio) target = 0.f;
+            target = std::min(1.f, std::max(0.f, target));
+            confGate_ += (target - confGate_) * (target < confGate_ ? aGateDown_ : aGateUp_);
+            // 3) Der Gegenschall darf nie lauter sein als das Geräusch selbst.
+            ydPow_ += (y * y - ydPow_) * aShort_;
+            float cap = 1.f;
+            if (ydPow_ > inFast_ && ydPow_ > 1e-12f) cap = std::sqrt(inFast_ / ydPow_);
+            yd = y * confGate_ * cap;
         }
         U_[(int)(m_ & kDecMask)] = yd;
         outFast_ += (yd * yd * gCur_ * gCur_ * gate_ - outFast_) * aFast_;
@@ -278,8 +302,7 @@ private:
     void publishStats() {
         const float inDb = 10.f * std::log10(inFast_ + 1e-12f);
         const float outDb = 10.f * std::log10(outFast_ + 1e-12f);
-        float pred = 1.f - pe_ / std::max(px_, 1e-12f);
-        pred = std::min(1.f, std::max(0.f, pred));
+        float pred = std::min(1.f, std::max(0.f, conf_));
         float red = 10.f * std::log10(std::max(px_, 1e-12f) / std::max(pe_, 1e-12f));
         red = std::min(40.f, std::max(0.f, red));
         sInDb_.store(inDb, std::memory_order_relaxed);
@@ -287,6 +310,7 @@ private:
         sPred_.store(pred, std::memory_order_relaxed);
         sRedDb_.store(red, std::memory_order_relaxed);
         sGain_.store(gCur_ * gate_, std::memory_order_relaxed);
+        sGate_.store(confGate_, std::memory_order_relaxed);
     }
 
     // Konfiguration
@@ -308,6 +332,11 @@ private:
     float aFast_ = 0.005f, aSlow_ = 3e-5f, aTrack_ = 0.001f, aStat_ = 2.5e-4f;
     float inFast_ = 0.f, inSlow_ = 0.f, outFast_ = 0.f, px_ = 1e-12f, pe_ = 1e-12f;
     int warm_ = 0, warmupSamples_ = 4000, muteCount_ = 0;
+    float aShort_ = 0.003f, aMid_ = 1.25e-4f, aGateDown_ = 0.016f, aGateUp_ = 4e-4f;
+    float pxS_ = 1e-12f, peS_ = 1e-12f, inMid_ = 0.f, ydPow_ = 0.f, conf_ = 0.f, confGate_ = 0.f;
+    static constexpr float kConfLow = 0.6f;     // unter 60 % Treffer: kein Gegenschall
+    static constexpr float kConfHigh = 0.9f;    // ab 90 %: voller Gegenschall
+    static constexpr float kStatRatio = 2.0f;   // > 3 dB Pegeländerung: pausieren
 
     // Parameter
     std::atomic<float> gainTarget_{1.f};
@@ -317,7 +346,7 @@ private:
 
     // Statistik
     std::atomic<float> sInDb_{-120.f}, sOutDb_{-120.f}, sPred_{0.f}, sRedDb_{0.f};
-    std::atomic<float> sHorizonMs_{0.f}, sGain_{0.f};
+    std::atomic<float> sHorizonMs_{0.f}, sGain_{0.f}, sGate_{0.f};
     std::atomic<int> sFeedback_{0};
 };
 

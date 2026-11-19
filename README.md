@@ -45,14 +45,21 @@ g++ -O2 -std=c++17 test/sim.cpp -o sim && ./sim
 Ergebnis (Pegel am Ohr, Bereich < 1 kHz):
 
 ```
-Toene, 25 ms Latenz (Kabel)                -> -34 dB
-Toene, 180 ms Latenz (Bluetooth)           -> -34 dB
+Toene, 25 ms Latenz (Kabel)                -> -33 dB
+Toene, 180 ms Latenz (Bluetooth)           -> -29 dB
 Toene + starkes Rauschen, 25 ms            -> -21 dB
 Toene, 25 ms, 0.3 ms Messfehler            -> -12 dB   (dafür gibt es die Feinabstimmung)
-Toene, 25 ms, Uebersprechen 20 %           -> -15 dB
 Nur Rauschen (darf nicht lauter werden)    ->  +0 dB
-Lautsprecher, Rueckkopplung 150 %          ->  -3 dB   (stabil, kein Aufschaukeln)
+Auto, 25 ms, Handy in Tasche (1 m)         ->  +0 dB   (vor v1.0.2: bis +3,7 dB lauter)
 ```
+
+### Schutz gegen „lauter statt leiser“ (ab v1.0.2)
+
+Feedforward-ANC ohne Fehlermikrofon kann Geräusche verstärken, wenn der Schall aus einer ungünstigen Richtung kommt. Deshalb gibt die App nur Gegenschall aus, wenn drei Bedingungen erfüllt sind:
+
+1. Die Vorhersage von vor *Latenz* Millisekunden hat das jetzige Geräusch zu mindestens 60 % getroffen (voll ab 90 %).
+2. Der Pegel ist stabil (Änderung < 3 dB). Ein sich näherndes Auto ändert Pegel und Richtung, also wird pausiert.
+3. Der Gegenschall ist nie lauter als das Geräusch selbst.
 
 In der Praxis ist die Wirkung kleiner als in der Simulation, weil das Handy-Mikrofon nicht im Ohr sitzt und Wandler und Kopfhörer eigene Phasengänge haben. Realistisch sind einige dB bei gleichmäßigem Brummen.
 

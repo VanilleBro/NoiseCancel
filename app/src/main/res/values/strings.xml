@@ -10,10 +10,11 @@
     <string name="state_error">Fehler: %1$s</string>
     <string name="state_restarting">Audiogerät gewechselt – starte neu …</string>
     <string name="state_quiet">Aktiv – es ist gerade sehr leise.</string>
-    <string name="state_unpredictable">Aktiv – Geräusch ist kaum vorhersagbar (Stimmen, Rauschen). Hier ist kaum Dämpfung möglich.</string>
+    <string name="state_unpredictable">Pausiert – Geräusch ist nicht vorhersagbar (Stimmen, Rauschen, Verkehr). Hier ist keine Dämpfung möglich.</string>
+    <string name="state_changing">Pausiert – das Geräusch ändert sich gerade (z. B. vorbeifahrendes Auto). Gegenschall würde es hier lauter machen.</string>
     <string name="state_active">Aktiv – gleichmäßiges Geräusch erkannt, Gegenschall läuft.</string>
 
-    <string name="route_wired">Kabelkopfhörer erkannt – beste Bedingungen.</string>
+    <string name="route_wired">Kabelkopfhörer erkannt. Hat das Kabel ein Mikrofon, wird es benutzt – je näher das Mikrofon am Ohr, desto besser.</string>
     <string name="route_bt">Bluetooth-Kopfhörer: hohe Funk-Latenz. Wirkt nur bei sehr gleichmäßigen Tönen – Kabel ist deutlich besser.</string>
     <string name="route_speaker">Kein Kopfhörer: Über den Lautsprecher wirkt Gegenschall nur an einem Punkt im Raum und kann rückkoppeln. Bitte Kopfhörer anschließen.</string>
 
@@ -29,7 +30,8 @@
 
     <string name="analysis_title">Analyse</string>
     <string name="row_input">Mikrofonpegel (unter 1 kHz)</string>
-    <string name="row_pred">Vorhersagbarer Anteil</string>
+    <string name="row_pred">Vorhersage-Treffer (aktuell)</string>
+    <string name="row_gate">Gegenschall freigegeben</string>
     <string name="row_red">Theoretisch mögliche Dämpfung</string>
     <string name="row_latency">Audio-Latenz</string>
     <string name="row_path">Audiopfad</string>
@@ -49,7 +51,7 @@
     <string name="relearn_toast">Filter zurückgesetzt – lernt neu</string>
 
     <string name="how_title">So funktioniert es</string>
-    <string name="how_text">Das Mikrofon nimmt das Umgebungsgeräusch auf. Ein adaptiver Filter (NLMS) lernt dessen gleichmäßige Anteile und sagt sie genau um die gemessene Audio-Latenz des Handys voraus. Diese Vorhersage wird gegenphasig (um 180° gedreht) über den Kopfhörer abgespielt, sodass sich Schall und Gegenschall am Ohr gegenseitig auslöschen.\n\nGut wirkt das bei gleichmäßigen, tiefen Geräuschen unter etwa 900 Hz: Lüfter, Klimaanlage, Motoren, Kühlschrank, Netzbrummen, Fahrgeräusche. Stimmen, Klappern oder Rauschen sind nicht vorhersagbar – dafür gibt die App automatisch keinen Gegenschall aus.\n\nTipps: Kabelkopfhörer nutzen, Handy ruhig halten, Mikrofon nicht abdecken. Bei plötzlicher Rückkopplung schaltet sich der Gegenschall kurz stumm und lernt neu.</string>
+    <string name="how_text">Das Mikrofon nimmt das Umgebungsgeräusch auf. Ein adaptiver Filter (NLMS) lernt dessen gleichmäßige Anteile und sagt sie genau um die gemessene Audio-Latenz des Handys voraus. Diese Vorhersage wird gegenphasig (um 180° gedreht) über den Kopfhörer abgespielt, sodass sich Schall und Gegenschall am Ohr gegenseitig auslöschen.\n\nGut wirkt das bei gleichmäßigen, tiefen Geräuschen unter etwa 900 Hz: Lüfter, Klimaanlage, Motoren, Kühlschrank, Netzbrummen, Fahrgeräusche. Stimmen, Klappern oder Rauschen sind nicht vorhersagbar – dafür gibt die App automatisch keinen Gegenschall aus.\n\nWichtig: Das Mikrofon muss nah am Ohr sein. Steckt das Handy in der Hosentasche, kommt der Schall aus jeder Richtung anders am Ohr an als am Mikrofon – dann passt die Phase nicht und Gegenschall würde das Geräusch verstärken. Deshalb pausiert die App automatisch, sobald sich das Geräusch ändert oder die Vorhersage nicht trifft.\n\nTipps: Kabelkopfhörer (am besten mit Kabelmikrofon) nutzen, Handy ruhig und nah am Kopf halten, Mikrofon nicht abdecken. Bei plötzlicher Rückkopplung schaltet sich der Gegenschall kurz stumm und lernt neu.</string>
 
     <string name="need_mic">Ohne Mikrofon-Berechtigung kann die App nicht arbeiten.</string>
     <string name="err_foreground">Dienst konnte nicht starten: %1$s</string>

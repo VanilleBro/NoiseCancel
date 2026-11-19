@@ -23,7 +23,7 @@ public class MainActivity extends Activity {
     private static final int REQ_PERMS = 42;
 
     private TextView btnToggle, tvState, tvRoute, tvGainValue, tvOffsetValue;
-    private TextView tvInput, tvPred, tvRed, tvLatency, tvPath, tvOut, tvEvents;
+    private TextView tvInput, tvPred, tvRed, tvLatency, tvPath, tvOut, tvEvents, tvGate;
     private SeekBar sbGain, sbOffset;
     private ProgressBar pbPred;
     private AudioManager audioManager;
@@ -59,6 +59,7 @@ public class MainActivity extends Activity {
         tvPath = findViewById(R.id.tvPath);
         tvOut = findViewById(R.id.tvOut);
         tvEvents = findViewById(R.id.tvEvents);
+        tvGate = findViewById(R.id.tvGate);
         sbGain = findViewById(R.id.sbGain);
         sbOffset = findViewById(R.id.sbOffset);
         pbPred = findViewById(R.id.pbPred);
@@ -191,7 +192,9 @@ public class MainActivity extends Activity {
             tvState.setText(R.string.state_restarting);
         } else if (stats[NativeEngine.S_INPUT_DB] < -85f) {
             tvState.setText(R.string.state_quiet);
-        } else if (stats[NativeEngine.S_PREDICTABLE] < 0.25f) {
+        } else if (stats[NativeEngine.S_CONF_GATE] < 0.1f && stats[NativeEngine.S_PREDICTABLE] >= 0.6f) {
+            tvState.setText(R.string.state_changing);
+        } else if (stats[NativeEngine.S_CONF_GATE] < 0.1f) {
             tvState.setText(R.string.state_unpredictable);
         } else {
             tvState.setText(R.string.state_active);
@@ -208,6 +211,7 @@ public class MainActivity extends Activity {
             tvPath.setText(R.string.dash);
             tvOut.setText(R.string.dash);
             tvEvents.setText(R.string.dash);
+            tvGate.setText(R.string.dash);
             return;
         }
 
@@ -216,6 +220,7 @@ public class MainActivity extends Activity {
         int pct = Math.round(stats[NativeEngine.S_PREDICTABLE] * 100f);
         pbPred.setProgress(pct);
         tvPred.setText(getString(R.string.percent_value, pct));
+        tvGate.setText(getString(R.string.percent_value, Math.round(stats[NativeEngine.S_CONF_GATE] * 100f)));
         tvRed.setText(getString(R.string.reduction_value, stats[NativeEngine.S_REDUCTION_DB]));
         tvLatency.setText(getString(stats[NativeEngine.S_LATENCY_MEASURED] > 0.5f
                         ? R.string.latency_measured : R.string.latency_estimated,

@@ -21,7 +21,7 @@ public final class NativeEngine {
     public static final int S_HORIZON_MS = 11;
     public static final int S_GAIN_APPLIED = 12;
     public static final int S_RESTARTING = 13;
-    public static final int S_OUT_BUFFER = 14;
+    public static final int S_CONF_GATE = 14;
     public static final int S_LOW_LATENCY = 15;
     public static final int STATS_SIZE = 16;
 

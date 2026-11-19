@@ -201,6 +201,11 @@
                 android:progressTint="@color/accent" />
 
             <LinearLayout style="@style/Row">
+                <TextView style="@style/RowLabel" android:text="@string/row_gate" />
+                <TextView android:id="@+id/tvGate" style="@style/RowValue" android:text="@string/dash" />
+            </LinearLayout>
+
+            <LinearLayout style="@style/Row">
                 <TextView style="@style/RowLabel" android:text="@string/row_red" />
                 <TextView android:id="@+id/tvRed" style="@style/RowValue" android:text="@string/dash" />
             </LinearLayout>
