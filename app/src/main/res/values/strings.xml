@@ -18,6 +18,37 @@
     <string name="route_bt">Bluetooth-Kopfhörer: hohe Funk-Latenz. Wirkt nur bei sehr gleichmäßigen Tönen – Kabel ist deutlich besser.</string>
     <string name="route_speaker">Kein Kopfhörer: Über den Lautsprecher wirkt Gegenschall nur an einem Punkt im Raum und kann rückkoppeln. Bitte Kopfhörer anschließen.</string>
 
+    <string name="noise_switch">Rauschen (Maskierung)</string>
+    <string name="noise_brown">Braun · tief</string>
+    <string name="noise_pink">Rosa · ausgewogen</string>
+    <string name="noise_level">Lautstärke</string>
+    <string name="noise_value">%1$d %% · %2$.0f dBFS</string>
+    <string name="noise_off">Aus</string>
+    <string name="noise_hint_brown">Tiefes, weiches Rauschen wie Meeresbrandung oder Flugzeugkabine. Überdeckt Verkehr, Motoren und Brummen am besten. Gerade so laut stellen, dass das Störgeräusch verschwindet – nicht lauter, deinem Gehör zuliebe.</string>
+    <string name="noise_hint_pink">Gleichmäßiges Rauschen wie Regen oder ein Wasserfall. Überdeckt Stimmen, Klappern und Tastaturgeräusche besonders gut. Gerade so laut stellen, dass das Störgeräusch verschwindet – nicht lauter, deinem Gehör zuliebe.</string>
+
+    <string name="anc_switch">Gegenschall (ANC)</string>
+    <string name="anc_hint">Löscht gleichmäßiges Brummen (Lüfter, Motor, Kühlschrank) durch gegenphasigen Schall. Wirkt nur, wenn Phase und Stärke zu deinem Ohr passen – starte dafür unten den Abstimm-Assistenten.</string>
+
+    <string name="calib_start">Abstimm-Assistent starten</string>
+    <string name="calib_not_done">Noch nicht abgestimmt: Ohne Abstimmung trifft der Gegenschall dein Ohr meist mit falscher Phase und bringt nichts. Starte den Assistenten neben dem Brummen.</string>
+    <string name="calib_done">Abgestimmt: Phase %1$+.1f ms · Stärke %2$d %%. Wenn du den Ort oder das Geräusch wechselst, neu abstimmen.</string>
+    <string name="calib_stage">Stufe %1$d von 3 · %2$s</string>
+    <string name="calib_s0">Phase grob</string>
+    <string name="calib_s1">Phase fein</string>
+    <string name="calib_s2">Stärke</string>
+    <string name="calib_step">Brummton %1$.0f Hz · Einstellung %2$d von %3$d: %4$s\nHör genau hin und tippe, sobald das Brummen am leisesten ist. Die Einstellungen laufen in Schleife.</string>
+    <string name="calib_paused">\nGegenschall gerade pausiert – das Geräusch ist zu unruhig. Warte, bis es gleichmäßig ist.</string>
+    <string name="calib_pick">Jetzt am leisesten!</string>
+    <string name="calib_cancel">Abbrechen</string>
+    <string name="calib_no_tone">Kein gleichmäßiger Brummton erkannt. Der Assistent braucht ein dauerhaftes Geräusch (Lüfter, Motor, Kühlschrank). Lass den Gegenschall erst ca. 10 Sekunden laufen.</string>
+    <string name="calib_need_running">Starte zuerst die App mit eingeschaltetem Gegenschall.</string>
+    <string name="calib_finished">Abgestimmt! Phase %1$+.1f ms, Stärke %2$d %%</string>
+    <string name="calib_cancelled">Abstimmung abgebrochen – alte Werte bleiben.</string>
+
+    <string name="need_feature">Schalte Rauschen oder Gegenschall ein.</string>
+    <string name="state_noise_only">Rauschen läuft – auch im Hintergrund. Gegenschall ist aus.</string>
+
     <string name="mic_switch">Kopfhörer-Mikrofon verwenden</string>
     <string name="mic_hint">Nutzt automatisch das Mikrofon direkt am Ohr: Bluetooth-Headset, sonst Kabel-/USB-Headset, sonst Handy. Bei Bluetooth schaltet Android dafür in den Freisprechmodus (Telefonqualität, etwas mehr Latenz).</string>
     <string name="mic_active">Aktives Mikrofon: %1$s</string>
@@ -64,7 +95,7 @@
     <string name="relearn_toast">Filter zurückgesetzt – lernt neu</string>
 
     <string name="how_title">So funktioniert es</string>
-    <string name="how_text">Das Mikrofon nimmt das Umgebungsgeräusch auf. Ein adaptiver Filter (NLMS) lernt dessen gleichmäßige Anteile und sagt sie genau um die gemessene Audio-Latenz des Handys voraus. Diese Vorhersage wird gegenphasig (um 180° gedreht) über den Kopfhörer abgespielt, sodass sich Schall und Gegenschall am Ohr gegenseitig auslöschen.\n\nGut wirkt das bei gleichmäßigen, tiefen Geräuschen unter etwa 900 Hz: Lüfter, Klimaanlage, Motoren, Kühlschrank, Netzbrummen, Fahrgeräusche. Stimmen, Klappern oder Rauschen sind nicht vorhersagbar – dafür gibt die App automatisch keinen Gegenschall aus.\n\nWichtig: Das Mikrofon muss nah am Ohr sein. Steckt das Handy in der Hosentasche, kommt der Schall aus jeder Richtung anders am Ohr an als am Mikrofon – dann passt die Phase nicht und Gegenschall würde das Geräusch verstärken. Deshalb pausiert die App automatisch, sobald sich das Geräusch ändert oder die Vorhersage nicht trifft.\n\nTipps: Kabelkopfhörer (am besten mit Kabelmikrofon) nutzen, Handy ruhig und nah am Kopf halten, Mikrofon nicht abdecken. Bei plötzlicher Rückkopplung schaltet sich der Gegenschall kurz stumm und lernt neu.</string>
+    <string name="how_text">Rauschen (Maskierung): Braunes oder rosa Rauschen überdeckt Störgeräusche. Das Ohr nimmt ein gleichmäßiges Rauschen nach kurzer Zeit kaum noch wahr, die Störgeräusche gehen darin unter. Das wirkt bei jedem Geräusch, auch bei Verkehr und Stimmen, und funktioniert ohne Mikrofon.\n\nGegenschall (ANC): Das Mikrofon nimmt das Geräusch auf. Ein adaptiver Filter (NLMS) lernt dessen gleichmäßige Anteile und sagt sie um die gemessene Audio-Latenz voraus. Diese Vorhersage wird gegenphasig abgespielt, sodass sich Schall und Gegenschall am Ohr auslöschen. Weil das Handy-Mikrofon nicht im Ohr sitzt, müssen Phase und Stärke einmal nach Gehör abgestimmt werden – dafür gibt es den Assistenten. Das wirkt nur bei gleichmäßigem, tiefem Brummen unter etwa 900 Hz. Bei wechselnden Geräuschen pausiert der Gegenschall automatisch, damit er nichts lauter macht.\n\nAm besten: beides zusammen. Der Gegenschall nimmt dem Brummen die Spitze, das Rauschen überdeckt den Rest – dann reicht ein leiseres Rauschen.</string>
 
     <string name="need_mic">Ohne Mikrofon-Berechtigung kann die App nicht arbeiten.</string>
     <string name="err_foreground">Dienst konnte nicht starten: %1$s</string>
@@ -73,6 +104,10 @@
     <string name="notif_channel">Geräuschunterdrückung</string>
     <string name="notif_channel_desc">Zeigt an, dass die Geräuschunterdrückung läuft.</string>
     <string name="notif_title">Geräuschunterdrückung aktiv</string>
+    <string name="notif_title_both">Rauschen + Gegenschall aktiv</string>
+    <string name="notif_text_both">Gegenschall %1$d %% · Rauschen %2$d %%</string>
+    <string name="notif_title_noise">Rauschen aktiv</string>
+    <string name="notif_text_noise">Lautstärke %1$d %% · Tippen zum Öffnen</string>
     <string name="notif_text">Stärke %1$d %% · Tippen zum Öffnen</string>
     <string name="notif_stop">Ausschalten</string>
 </resources>

@@ -67,18 +67,113 @@
             android:textColor="@color/muted"
             android:textSize="13sp" />
 
-        <!-- Mikrofon -->
+        <!-- Rauschen -->
         <LinearLayout style="@style/Card">
+
+            <Switch
+                android:id="@+id/swNoise"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:text="@string/noise_switch"
+                android:textColor="@color/text"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:thumbTint="@color/accent"
+                android:trackTint="@color/track" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/chipBrown"
+                    style="@style/Chip"
+                    android:layout_marginEnd="6dp"
+                    android:text="@string/noise_brown" />
+
+                <TextView
+                    android:id="@+id/chipPink"
+                    style="@style/Chip"
+                    android:layout_marginStart="6dp"
+                    android:text="@string/noise_pink" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/CardTitle"
+                    android:text="@string/noise_level"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/tvNoiseValue"
+                    style="@style/Value" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/btnNoiseMinus"
+                    style="@style/StepButton"
+                    android:text="−" />
+
+                <SeekBar
+                    android:id="@+id/sbNoise"
+                    style="@style/Slider" />
+
+                <TextView
+                    android:id="@+id/btnNoisePlus"
+                    style="@style/StepButton"
+                    android:text="+" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvNoiseHint"
+                style="@style/Hint"
+                android:text="@string/noise_hint_brown" />
+        </LinearLayout>
+
+        <!-- Gegenschall (ANC) -->
+        <LinearLayout style="@style/Card">
+
+            <Switch
+                android:id="@+id/swAnc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:text="@string/anc_switch"
+                android:textColor="@color/text"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:thumbTint="@color/accent"
+                android:trackTint="@color/track" />
+
+            <TextView
+                style="@style/Hint"
+                android:text="@string/anc_hint" />
 
             <Switch
                 android:id="@+id/swHeadsetMic"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:minHeight="48dp"
+                android:layout_marginTop="8dp"
                 android:text="@string/mic_switch"
                 android:textColor="@color/text"
-                android:textSize="16sp"
-                android:textStyle="bold"
+                android:textSize="15sp"
                 android:thumbTint="@color/accent"
                 android:trackTint="@color/track" />
 
@@ -191,6 +286,84 @@
             <TextView
                 style="@style/Hint"
                 android:text="@string/offset_hint" />
+
+            <TextView
+                android:id="@+id/tvCalibHint"
+                style="@style/Hint"
+                android:layout_marginTop="10dp"
+                android:text="@string/calib_not_done"
+                android:textColor="@color/warn" />
+
+            <TextView
+                android:id="@+id/btnCalib"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_primary"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="@string/calib_start"
+                android:textColor="@color/bg"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/calibPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/tvCalibStage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <ProgressBar
+                    android:id="@+id/pbCalib"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="8dp"
+                    android:layout_marginTop="8dp"
+                    android:progressBackgroundTint="@color/track"
+                    android:progressTint="@color/accent2" />
+
+                <TextView
+                    android:id="@+id/tvCalibStep"
+                    style="@style/Hint" />
+
+                <TextView
+                    android:id="@+id/btnCalibPick"
+                    android:layout_width="match_parent"
+                    android:layout_height="72dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_primary"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="@string/calib_pick"
+                    android:textColor="@color/bg"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btnCalibCancel"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_step"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="@string/calib_cancel"
+                    android:textColor="@color/text"
+                    android:textSize="14sp" />
+            </LinearLayout>
         </LinearLayout>
 
         <!-- Analyse -->

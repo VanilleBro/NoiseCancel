@@ -29,12 +29,16 @@ jobs:
       - name: DSP-Simulation (Funktionstest des Algorithmus)
         run: |
           g++ -O2 -std=c++17 test/sim.cpp -o sim
+          g++ -O2 -std=c++17 test/noise_test.cpp -o noise_test
+          ./noise_test
           {
             echo "**Installation:** NoiseCancel.apk unten herunterladen, öffnen und Installation aus unbekannter Quelle erlauben."
             echo
             echo "Simulierte Dämpfung des DSP-Kerns in diesem Build:"
             echo '```'
             ./sim
+            echo
+            ./noise_test
             echo '```'
           } | tee notes.md
 

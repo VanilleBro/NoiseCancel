@@ -32,6 +32,11 @@ final class MicRouting {
     private MicRouting() {
     }
 
+    /** Kein Mikrofon (nur Rauschen). */
+    static MicRouting none() {
+        return new MicRouting();
+    }
+
     static MicRouting prepare(Context ctx, boolean preferHeadsetMic) {
         MicRouting r = new MicRouting();
         AudioManager am = (AudioManager) ctx.getSystemService(Context.AUDIO_SERVICE);

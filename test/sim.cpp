@@ -140,6 +140,96 @@ static void runCar(double delayMs, double pathMs, const char* name) {
                 name, 10 * std::log10(pr / ps), worst);
 }
 
+// Abstimm-Assistent: Ohr hört den Schall 1,7 ms später und 40 % leiser als das
+// Mikrofon (Handy-Mikro nicht am Ohr). Ein "idealer Hörer" wählt in jeder Stufe
+// die leiseste Einstellung – so wie der Nutzer per Tipp.
+struct CalibSim {
+    int fs = 48000, D;
+    anc::AncDsp dsp;
+    std::mt19937 rng{3};
+    std::normal_distribution<double> nd{0.0, 1.0};
+    double ph[4] = {0, 1, 2, 3};
+    std::vector<float> hist;          // Mikrofonverlauf für Ohr-Verzögerung
+    std::vector<float> outHist;       // Gegenschall-Verlauf (Latenz D)
+    long long n = 0;
+    const double earDelay = 0.0017, earGain = 0.6;
+    CalibSim() : D(25 * 48) {
+        dsp.init(fs);
+        dsp.setGain(1.0f);
+        dsp.setLoopDelaySeconds(0.025f);
+        hist.assign(1 << 16, 0.f);
+        outHist.assign(1 << 16, 0.f);
+    }
+    // läuft 'sec' Sekunden, liefert Pegel am Ohr relativ zu ohne ANC (letzte Sekunde)
+    double run(double sec) {
+        const double f[] = {100, 200, 300, 150};
+        const double a[] = {0.05, 0.02, 0.012, 0.01};
+        const int B = 192, total = (int)(sec * fs);
+        std::vector<float> mic(B), out(B);
+        double pa = 0, pr = 0;
+        const int eD = (int)std::lround(earDelay * fs);
+        for (int k = 0; k < total; k += B) {
+            for (int i = 0; i < B; ++i) {
+                double v = 0;
+                for (int j = 0; j < 4; ++j) { ph[j] += 2 * kPi * f[j] / fs; v += a[j] * std::sin(ph[j]); }
+                v += 0.002 * nd(rng);
+                mic[i] = (float)v;
+                hist[(n + i) & 0xFFFF] = (float)v;
+            }
+            dsp.process(mic.data(), out.data(), B);
+            for (int i = 0; i < B; ++i) {
+                const long long t = n + i;
+                outHist[t & 0xFFFF] = out[i];
+                const double ear = earGain * hist[(t - eD) & 0xFFFF];
+                const double r = ear + outHist[(t - D) & 0xFFFF];
+                if (k >= total - fs) { pa += ear * ear; pr += r * r; }
+            }
+            n += B;
+        }
+        return 10 * std::log10(pr / pa);
+    }
+};
+
+static void runCalibration() {
+    CalibSim cs;
+    cs.run(15);
+    const double before = cs.run(2);
+    const float f0 = cs.dsp.dominantHz();
+    std::printf("Assistent: erkannter Brummton %.0f Hz (erwartet 100)\n", f0);
+    if (f0 <= 0) return;
+    const double T = 1000.0 / f0;            // ms
+    // Stufe 1: grob, 16 Schritte über eine Periode
+    double bestOff = 0, best = 1e9;
+    for (int k = 0; k < 16; ++k) {
+        double off = -T / 2 + k * T / 16;
+        cs.dsp.setOffsetSeconds((float)(off / 1000));
+        const double r = cs.run(1.5);
+        if (r < best) { best = r; bestOff = off; }
+    }
+    // Stufe 2: fein, 5 Schritte um den besten Wert
+    const double step = T / 16 / 2.5;
+    double fineBest = bestOff;
+    for (int k = -2; k <= 2; ++k) {
+        const double off = bestOff + k * step;
+        cs.dsp.setOffsetSeconds((float)(off / 1000));
+        const double r = cs.run(1.5);
+        if (r < best) { best = r; fineBest = off; }
+    }
+    cs.dsp.setOffsetSeconds((float)(fineBest / 1000));
+    // Stufe 3: Stärke in 2-dB-Schritten (-6 .. +6 dB)
+    double bestG = 1.0;
+    for (int k = -3; k <= 3; ++k) {
+        const double g = std::pow(10.0, 2.0 * k / 20.0);
+        cs.dsp.setGain((float)g);
+        const double r = cs.run(1.5);
+        if (r < best) { best = r; bestG = g; }
+    }
+    cs.dsp.setGain((float)bestG);
+    const double after = cs.run(3);
+    std::printf("Assistent: vorher %+.1f dB -> nachher %+.1f dB (Phase %+.2f ms, Staerke x%.2f)\n",
+                before, after, fineBest, bestG);
+}
+
 int main() {
     const Case cases[] = {
         {"Toene, 25 ms Latenz (Kabel)", 25, 0, 0, true, 0.002, 0},
@@ -159,6 +249,7 @@ int main() {
         const double d = run(c, &inDb, &outDb, &pred);
         std::printf("%-42s -> Pegel am Ohr: %+6.1f dB   (vorhersagbar %3.0f %%)\n", c.name, d, pred * 100);
     }
+    runCalibration();
     runCar(25, 0.0, "Auto, 25 ms, Mikrofon am Ohr");
     runCar(180, 0.0, "Auto, 180 ms (BT), Mikrofon am Ohr");
     runCar(25, 0.4, "Auto, 25 ms, Kabel-Mikro (15 cm)");

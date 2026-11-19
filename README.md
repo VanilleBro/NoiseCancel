@@ -12,10 +12,11 @@ Jeder Push auf `main` baut die App automatisch über GitHub Actions neu (`.githu
 
 ## Bedienung
 
-- **Starten/Stoppen:** großer runder Knopf. Danach kann die App geschlossen werden.
-- **Stärke:** Lautstärke des Gegenschalls (0,5 dB pro Schritt, 40 % = 0 dB). Langsam erhöhen, bis das Brummen am leisesten ist. Zu viel macht es wieder lauter.
-- **Feinabstimmung Phase:** ±20 ms. Gleicht Laufzeiten aus, die das Handy nicht messen kann (Wandler, Abstand Mikrofon–Ohr).
-- **Analyse:** zeigt, wie viel des aktuellen Geräuschs vorhersagbar und damit auslöschbar ist, die gemessene Audio-Latenz und den Audiopfad.
+- **Starten/Stoppen:** großer runder Knopf. Danach kann die App geschlossen werden, sie läuft im Hintergrund weiter.
+- **Rauschen (Maskierung):** braunes (tief, wie Brandung) oder rosa Rauschen (ausgewogen, wie Regen) mit Lautstärkeregler. Überdeckt jedes Störgeräusch, auch Verkehr und Stimmen, und braucht kein Mikrofon. Beide Kanäle sind unabhängig, das klingt räumlicher.
+- **Gegenschall (ANC):** löscht gleichmäßiges Brummen. Muss einmal mit dem **Abstimm-Assistenten** auf dein Ohr abgestimmt werden: Die App erkennt den Brummton und spielt nacheinander Phasen- und Stärke-Einstellungen ab, du tippst, wenn es am leisesten ist (Phase grob → fein → Stärke).
+- **Stärke / Feinabstimmung Phase:** manuelle Regler, die der Assistent automatisch setzt.
+- **Analyse:** Vorhersage-Treffer, Freigabe des Gegenschalls, Latenz, Audiopfad, aktives Mikrofon.
 
 ## Technik
 
@@ -33,6 +34,10 @@ Jeder Push auf `main` baut die App automatisch über GitHub Actions neu (`.githu
 Kommerzielle ANC-Kopfhörer haben Latenzen im Mikrosekundenbereich und ein Fehler-Mikrofon im Ohr. Ein Handy hat 10–40 ms Audio-Latenz (Bluetooth 100–300 ms). In dieser Zeit ist der aufgenommene Schall längst am Ohr vorbei. Ein einfach invertiertes Signal käme also zu spät und würde das Geräusch eher verstärken.
 
 Gleichmäßige Geräusche (Lüfter, Motoren, Netzbrummen) sind aber periodisch und damit vorhersagbar. Der adaptive Prädiktor lernt sie und berechnet, wie das Geräusch in *Latenz* Millisekunden klingen wird. Zufällige Geräusche wie Stimmen oder Rauschen sind nicht vorhersagbar; dafür gibt der Filter automatisch keinen Gegenschall aus, macht also nichts lauter.
+
+### Warum der Assistent nötig ist (ab v1.0.4)
+
+Das Handy-Mikrofon hört den Schall zu einem etwas anderen Zeitpunkt und in anderer Lautstärke als dein Ohr. In der Simulation (Ohr hört 1,7 ms später und 40 % leiser) macht ANC ohne Abstimmung das Brummen **4,6 dB lauter**. Nach dem Assistenten ist es **19,8 dB leiser**. Die Phasen-Feinabstimmung wirkt seit v1.0.4 sofort über eine Verzögerungsleitung am Ausgang, ohne dass der Filter neu lernen muss. Erst dadurch lassen sich Einstellungen direkt nach Gehör vergleichen.
 
 ### Simulation
 

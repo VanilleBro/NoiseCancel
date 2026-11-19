@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "anc_dsp.h"
+#include "noise_gen.h"
 
 #define LOG_TAG "NoiseCancel"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -79,6 +80,15 @@ public:
     void setGain(float g) { dsp_.setGain(g); gain_.store(g); }
     void setOffsetMs(float ms) { dsp_.setOffsetSeconds(ms / 1000.f); offsetMs_.store(ms); }
     void resetFilter() { dsp_.requestReset(); }
+    // anc = Mikrofon + Gegenschall; ohne ANC läuft nur der Rauschgenerator (stromsparend)
+    void setFeatures(bool anc) { useMic_.store(anc); }
+    void setNoise(bool on, float rms, int color) { noise_.setParams(on, rms, color); }
+    float dominantHz() {
+        // Sperre verhindert, dass init() die Puffer gleichzeitig neu anlegt
+        std::unique_lock<std::mutex> lk(streamMtx_, std::try_to_lock);
+        if (!lk.owns_lock() || !in_) return 0.f;
+        return dsp_.dominantHz();
+    }
     void setDevices(int inId, int outId, bool comm) {
         wantIn_.store(inId); wantOut_.store(outId); comm_.store(comm);
     }
@@ -125,8 +135,10 @@ private:
         aaudio_result_t r = AAudio_createStreamBuilder(&b);
         if (r != AAUDIO_OK) { *resOut = r; return nullptr; }
         AAudioStreamBuilder_setDirection(b, dir);
-        AAudioStreamBuilder_setPerformanceMode(b, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
-        AAudioStreamBuilder_setSharingMode(b, AAUDIO_SHARING_MODE_EXCLUSIVE);
+        const bool lowLat = useMic_.load();
+        AAudioStreamBuilder_setPerformanceMode(b, lowLat ? AAUDIO_PERFORMANCE_MODE_LOW_LATENCY
+                                                         : AAUDIO_PERFORMANCE_MODE_POWER_SAVING);
+        AAudioStreamBuilder_setSharingMode(b, lowLat ? AAUDIO_SHARING_MODE_EXCLUSIVE : AAUDIO_SHARING_MODE_SHARED);
         AAudioStreamBuilder_setFormat(b, AAUDIO_FORMAT_PCM_FLOAT);
         AAudioStreamBuilder_setChannelCount(b, channels);
         if (rate > 0) AAudioStreamBuilder_setSampleRate(b, rate);
@@ -159,8 +171,9 @@ private:
         closeStreams();
         aaudio_result_t r = AAUDIO_OK;
 
-        const int wantOut = wantOut_.load(), wantIn = wantIn_.load();
-        const bool comm = comm_.load();
+        const bool useMic = useMic_.load();
+        const int wantOut = wantOut_.load(), wantIn = useMic ? wantIn_.load() : 0;
+        const bool comm = useMic && comm_.load();
         out_ = openOne(AAUDIO_DIRECTION_OUTPUT, 0, comm ? 1 : 2, AAUDIO_INPUT_PRESET_GENERIC, true, wantOut, &r);
         if (!out_ && wantOut > 0)   // Gerät verschwunden -> Standardausgabe
             out_ = openOne(AAUDIO_DIRECTION_OUTPUT, 0, comm ? 1 : 2, AAUDIO_INPUT_PRESET_GENERIC, true, 0, &r);
@@ -183,7 +196,7 @@ private:
                                                      AAUDIO_INPUT_PRESET_VOICE_COMMUNICATION,
                                                      AAUDIO_INPUT_PRESET_GENERIC};
         const aaudio_input_preset_t* presets = comm ? presetsComm : presetsNormal;
-        for (int pass = 0; pass < 2 && !in_; ++pass) {
+        for (int pass = 0; useMic && pass < 2 && !in_; ++pass) {
             const int dev = pass == 0 ? wantIn : 0;
             if (pass == 1 && wantIn <= 0) break;
             for (int k = 0; k < 3; ++k) {
@@ -195,14 +208,22 @@ private:
                 }
             }
         }
-        if (!in_) {
+        if (useMic && !in_) {
             setError(std::string("Mikrofon konnte nicht geöffnet werden: ") + AAudio_convertResultToText(r));
             return false;
         }
-        inChannels_ = AAudioStream_getChannelCount(in_);
-        inFormat_ = AAudioStream_getFormat(in_);
-        inBurst_ = std::max(16, (int)AAudioStream_getFramesPerBurst(in_));
-        AAudioStream_setBufferSizeInFrames(in_, AAudioStream_getBufferCapacityInFrames(in_));
+        if (in_) {
+            inChannels_ = AAudioStream_getChannelCount(in_);
+            inFormat_ = AAudioStream_getFormat(in_);
+            inBurst_ = std::max(16, (int)AAudioStream_getFramesPerBurst(in_));
+            AAudioStream_setBufferSizeInFrames(in_, AAudioStream_getBufferCapacityInFrames(in_));
+        } else {
+            inChannels_ = 1;
+            inFormat_ = AAUDIO_FORMAT_PCM_FLOAT;
+            inBurst_ = burst;
+            AAudioStream_setBufferSizeInFrames(out_, AAudioStream_getBufferCapacityInFrames(out_) / 2);
+            outBufferFrames_.store(AAudioStream_getBufferSizeInFrames(out_));
+        }
 
         if ((outFormat_ != AAUDIO_FORMAT_PCM_FLOAT && outFormat_ != AAUDIO_FORMAT_PCM_I16) ||
             (inFormat_ != AAUDIO_FORMAT_PCM_FLOAT && inFormat_ != AAUDIO_FORMAT_PCM_I16)) {
@@ -210,13 +231,14 @@ private:
             return false;
         }
 
-        exclusive_.store(AAudioStream_getSharingMode(out_) == AAUDIO_SHARING_MODE_EXCLUSIVE &&
+        exclusive_.store(in_ && AAudioStream_getSharingMode(out_) == AAUDIO_SHARING_MODE_EXCLUSIVE &&
                          AAudioStream_getSharingMode(in_) == AAUDIO_SHARING_MODE_EXCLUSIVE);
-        lowLatency_.store(AAudioStream_getPerformanceMode(out_) == AAUDIO_PERFORMANCE_MODE_LOW_LATENCY &&
+        lowLatency_.store(in_ && AAudioStream_getPerformanceMode(out_) == AAUDIO_PERFORMANCE_MODE_LOW_LATENCY &&
                           AAudioStream_getPerformanceMode(in_) == AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
         sampleRate_.store(rate);
-        actualIn_.store(AAudioStream_getDeviceId(in_));
+        actualIn_.store(in_ ? AAudioStream_getDeviceId(in_) : 0);
         actualOut_.store(AAudioStream_getDeviceId(out_));
+        noise_.init(rate);
 
         inF_.assign((size_t)kMaxFrames * std::max(1, inChannels_), 0.f);
         inI_.assign((size_t)kMaxFrames * std::max(1, inChannels_), 0);
@@ -241,7 +263,7 @@ private:
         cbCount_ = 0;
         needRestart_.store(false);
 
-        r = AAudioStream_requestStart(in_);
+        r = in_ ? AAudioStream_requestStart(in_) : AAUDIO_OK;
         if (r != AAUDIO_OK) {
             setError(std::string("Mikrofon-Start fehlgeschlagen: ") + AAudio_convertResultToText(r));
             return false;
@@ -295,21 +317,31 @@ private:
         for (int i = got; i < n; ++i) mono_[i] = 0.f;
     }
 
+    // Gegenschall (mono) + Maskierungsrauschen (pro Kanal) -> Ausgabepuffer
     void writeOutput(void* data, int offset, int n, bool silence) {
         const int ch = std::max(1, outChannels_);
+        float nz[8] = {0};
+        const int nch = std::min(ch, 8);
         if (outFormat_ == AAUDIO_FORMAT_PCM_FLOAT) {
             float* o = static_cast<float*>(data) + (size_t)offset * ch;
             for (int i = 0; i < n; ++i) {
-                const float v = silence ? 0.f : anti_[i];
-                for (int c = 0; c < ch; ++c) o[(size_t)i * ch + c] = v;
+                const float a = silence ? 0.f : anti_[i];
+                noise_.frame(nz, nch);
+                for (int c = 0; c < ch; ++c) {
+                    const float v = a + nz[std::min(c, nch - 1)];
+                    o[(size_t)i * ch + c] = std::max(-1.f, std::min(1.f, v));
+                }
             }
         } else {
             int16_t* o = static_cast<int16_t*>(data) + (size_t)offset * ch;
             for (int i = 0; i < n; ++i) {
-                float v = silence ? 0.f : anti_[i];
-                v = std::max(-1.f, std::min(1.f, v));
-                const int16_t q = (int16_t)std::lround(v * 32767.f);
-                for (int c = 0; c < ch; ++c) o[(size_t)i * ch + c] = q;
+                const float a = silence ? 0.f : anti_[i];
+                noise_.frame(nz, nch);
+                for (int c = 0; c < ch; ++c) {
+                    float v = a + nz[std::min(c, nch - 1)];
+                    v = std::max(-1.f, std::min(1.f, v));
+                    o[(size_t)i * ch + c] = (int16_t)std::lround(v * 32767.f);
+                }
             }
         }
     }
@@ -319,6 +351,13 @@ private:
         while (done < numFrames) {
             const int n = std::min(kMaxFrames, (int)numFrames - done);
             const int64_t blockStart = outFramesTotal_;
+
+            if (!in_) {   // nur Rauschen, kein Mikrofon
+                writeOutput(data, done, n, true);
+                outFramesTotal_ += n;
+                done += n;
+                continue;
+            }
 
             if (drainCount_ < kDrainCallbacks) {
                 // Anfangs Eingangspuffer leeren -> minimale Latenz
@@ -445,7 +484,8 @@ private:
     std::atomic<int64_t> frameOffset_{kInvalid};
     std::atomic<int> underruns_{0}, xruns_{0};
     std::atomic<int> wantIn_{0}, wantOut_{0}, actualIn_{0}, actualOut_{0};
-    std::atomic<bool> comm_{false};
+    std::atomic<bool> comm_{false}, useMic_{true};
+    anc::NoiseGen noise_;
 
     int outChannels_ = 2, inChannels_ = 1, outBurst_ = 192, inBurst_ = 192;
     aaudio_format_t outFormat_ = AAUDIO_FORMAT_PCM_FLOAT, inFormat_ = AAUDIO_FORMAT_PCM_FLOAT;
@@ -490,6 +530,22 @@ JNIEXPORT void JNICALL
 Java_com_vanillebro_noisecancel_NativeEngine_nativeSetDevices(JNIEnv*, jclass, jint inId, jint outId,
                                                               jboolean comm) {
     engine().setDevices(inId, outId, comm == JNI_TRUE);
+}
+
+JNIEXPORT void JNICALL
+Java_com_vanillebro_noisecancel_NativeEngine_nativeSetFeatures(JNIEnv*, jclass, jboolean anc) {
+    engine().setFeatures(anc == JNI_TRUE);
+}
+
+JNIEXPORT void JNICALL
+Java_com_vanillebro_noisecancel_NativeEngine_nativeSetNoise(JNIEnv*, jclass, jboolean on, jfloat rms,
+                                                            jint color) {
+    engine().setNoise(on == JNI_TRUE, rms, color);
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_vanillebro_noisecancel_NativeEngine_nativeGetDominantHz(JNIEnv*, jclass) {
+    return engine().dominantHz();
 }
 
 JNIEXPORT void JNICALL

@@ -41,8 +41,9 @@ public:
     static constexpr int kDecMask = kDecHist - 1;
     static constexpr int kInHist = 4096;           // Verlauf bei Gerätefrequenz
     static constexpr int kInMask = kInHist - 1;
-    static constexpr int kELine = 128;             // Feinverzögerungsleitung
-    static constexpr int kEMask = kELine - 1;
+    static constexpr int kOutDelay = 16384;        // Ausgabe-Verzögerungsleitung (Phase)
+    static constexpr int kOutMask = kOutDelay - 1;
+    static constexpr float kMaxOffsetSec = 0.02f;  // Phasen-Feinabstimmung ±20 ms
     static constexpr double kTargetDecRate = 4000.0;
     static constexpr double kCutoffHz = 1300.0;    // Wirksamer Bereich ca. 30–900 Hz
     static constexpr float kOutCeiling = 0.5f;     // max. Ausgangspegel (-6 dBFS), Gehörschutz
@@ -63,7 +64,8 @@ public:
         xd_.assign(kDecHist, 0.f);
         U_.assign(kDecHist, 0.f);
         w_.assign(kPredTaps, 0.f);
-        eLine_.assign(kELine, 0.f);
+        oLine_.assign(kOutDelay, 0.f);
+        xfLen_ = std::max(1, (int)(0.03 * fs_));   // 30 ms Überblendung bei Phasenänderung
 
         dcR_ = (float)std::exp(-2.0 * kPi * 1.0 / fs_);   // ~1 Hz Hochpass (kaum Phasenfehler bei 50 Hz)
         gSmooth_ = (float)(1.0 - std::exp(-1.0 / (0.05 * fs_)));
@@ -97,6 +99,44 @@ public:
     float statConfGate() const { return sGate_.load(std::memory_order_relaxed); }
     int statFeedbackEvents() const { return sFeedback_.load(std::memory_order_relaxed); }
     int sampleRate() const { return fs_; }
+
+    // Frequenz (40–900 Hz) des lautesten VORHERSAGBAREN Tons: Spektrum des Eingangs
+    // gewichtet mit dem Frequenzgang des gelernten Prädiktors. 0 = keiner gefunden.
+    // Nicht aus dem Audio-Thread aufrufen (einige ms Rechenzeit).
+    float dominantHz() const {
+        const int64_t m = mPub_.load(std::memory_order_relaxed);
+        const int N = 2048;
+        if (m < N || fsd_ <= 0) return 0.f;
+        std::vector<float> x(N), w(kPredTaps);
+        for (int i = 0; i < N; ++i) {
+            const double hann = 0.5 - 0.5 * std::cos(2.0 * kPi * i / (N - 1));
+            x[i] = (float)(xd_[(int)((m - N + 1 + i) & kDecMask)] * hann);
+        }
+        for (int k = 0; k < kPredTaps; ++k) w[k] = w_[k];
+        float bestF = 0.f;
+        double bestScore = 0.0, bestW = 0.0;
+        const double fmax = std::min(900.0, 0.45 * fsd_);
+        for (double f = 40.0; f <= fmax; f += 1.0) {
+            const double om = 2.0 * kPi * f / fsd_;
+            // Goertzel für |X(f)|
+            const double c = 2.0 * std::cos(om);
+            double s1 = 0, s2 = 0;
+            for (int i = 0; i < N; ++i) {
+                const double s0 = x[i] + c * s1 - s2;
+                s2 = s1; s1 = s0;
+            }
+            const double xmag = std::sqrt(std::max(0.0, s1 * s1 + s2 * s2 - c * s1 * s2));
+            double re = 0, im = 0;
+            for (int k = 0; k < kPredTaps; ++k) {
+                re += w[k] * std::cos(om * k);
+                im -= w[k] * std::sin(om * k);
+            }
+            const double wmag = std::sqrt(re * re + im * im);
+            const double score = xmag * wmag;
+            if (score > bestScore) { bestScore = score; bestF = (float)f; bestW = wmag; }
+        }
+        return bestW > 0.3 ? bestF : 0.f;
+    }
     int decimation() const { return R_; }
     int groupDelaySamples() const { return G_; }
 
@@ -128,8 +168,8 @@ private:
         std::fill(xd_.begin(), xd_.end(), 0.f);
         std::fill(U_.begin(), U_.end(), 0.f);
         std::fill(w_.begin(), w_.end(), 0.f);
-        std::fill(eLine_.begin(), eLine_.end(), 0.f);
-        inPos_ = 0; phase_ = 0; m_ = -1; ePos_ = 0;
+        std::fill(oLine_.begin(), oLine_.end(), 0.f);
+        inPos_ = 0; phase_ = 0; m_ = -1; oPos_ = 0;
         dcX1_ = dcY1_ = 0.f;
         gCur_ = 0.f; gate_ = 0.f;
         gTargetLocal_ = gainTarget_.load(std::memory_order_relaxed);
@@ -139,6 +179,8 @@ private:
         warm_ = 0; muteCount_ = 0;
         Qcur_ = -1;
         updateHorizon();
+        dPrev_ = dCur_;
+        xfLeft_ = 0;
     }
 
     void resetWeights() {
@@ -146,22 +188,35 @@ private:
         px_ = pe_ = 1e-12f;
     }
 
-    // Wandelt (Latenz + Feinabstimmung) in Vorhersagehorizont H (dezimiert)
-    // und Restverzögerung E (Gerätefrequenz) um:  H*R - E = Latenz*fs + 2*G + Offset
+    // Vorhersagehorizont H (dezimiert) und Ausgabeverzögerung D (Gerätefrequenz):
+    //   H*R - D = Latenz*fs + 2*G + Offset*fs
+    // H wird für den größtmöglichen Offset ausgelegt (Latenz + 20 ms). Die Phasen-
+    // Feinabstimmung verändert dann nur noch D – sofort hörbar, ohne dass der
+    // Filter neu lernen muss.
     void updateHorizon() {
-        double q = (double)(loopDelay_.load(std::memory_order_relaxed) +
-                            offset_.load(std::memory_order_relaxed)) * fs_ + 2.0 * G_;
+        const double lat = (double)loopDelay_.load(std::memory_order_relaxed) * fs_ + 2.0 * G_;
+        double q = lat + kMaxOffsetSec * fs_;
         if (q < R_) q = R_;
         const int qi = (int)std::lround(q);
-        if (qi == Qcur_) return;
-        int H = (qi + R_ - 1) / R_;
-        const int maxH = kDecHist - kPredTaps - 64;
-        if (H > maxH) H = maxH;
-        int E = H * R_ - qi;
-        if (E < 0) E = 0;
-        if (E >= R_) E = R_ - 1;
-        H_ = H; E_ = E; Qcur_ = qi;
-        sHorizonMs_.store((float)(1000.0 * (H_ * R_ - E_) / fs_), std::memory_order_relaxed);
+        if (qi != Qcur_) {
+            int H = (qi + R_ - 1) / R_;
+            const int maxH = kDecHist - kPredTaps - 64;
+            if (H > maxH) H = maxH;
+            H_ = H;
+            Dbase_ = H * R_ - (int)std::lround(lat);
+            Qcur_ = qi;
+        }
+        float off = offset_.load(std::memory_order_relaxed);
+        off = std::min(kMaxOffsetSec, std::max(-kMaxOffsetSec, off));
+        int d = Dbase_ - (int)std::lround((double)off * fs_);
+        if (d < 0) d = 0;
+        if (d > kOutDelay - 2) d = kOutDelay - 2;
+        if (d != dCur_) {
+            dPrev_ = dCur_;
+            dCur_ = d;
+            xfLeft_ = xfLen_;
+        }
+        sHorizonMs_.store((float)(1000.0 * H_ * R_ / fs_), std::memory_order_relaxed);
     }
 
     static inline float softLimit(float y) {
@@ -200,10 +255,15 @@ private:
         }
         v *= (float)R_;
 
-        // Feinverzögerung
-        eLine_[ePos_] = v;
-        const float delayed = eLine_[(ePos_ - E_) & kEMask];
-        ePos_ = (ePos_ + 1) & kEMask;
+        // Phasenverzögerung (mit Überblendung bei Änderung -> kein Knacken)
+        oLine_[oPos_] = v;
+        float delayed = oLine_[(oPos_ - dCur_) & kOutMask];
+        if (xfLeft_ > 0) {
+            const float a = (float)xfLeft_ / (float)xfLen_;
+            delayed = a * oLine_[(oPos_ - dPrev_) & kOutMask] + (1.f - a) * delayed;
+            --xfLeft_;
+        }
+        oPos_ = (oPos_ + 1) & kOutMask;
 
         // Stärke (sanft geglättet) + Stummschaltung bei Rückkopplung
         gCur_ += (gTargetLocal_ - gCur_) * gSmooth_;
@@ -300,6 +360,7 @@ private:
     }
 
     void publishStats() {
+        mPub_.store(m_, std::memory_order_relaxed);
         const float inDb = 10.f * std::log10(inFast_ + 1e-12f);
         const float outDb = 10.f * std::log10(outFast_ + 1e-12f);
         float pred = std::min(1.f, std::max(0.f, conf_));
@@ -323,10 +384,11 @@ private:
     static constexpr float kFeedbackRatio = 30.f;   // ~15 dB Sprung
 
     // Zustand
-    std::vector<float> inHist_, xd_, U_, w_, eLine_;
-    int inPos_ = 0, phase_ = 0, ePos_ = 0;
+    std::vector<float> inHist_, xd_, U_, w_, oLine_;
+    int inPos_ = 0, phase_ = 0, oPos_ = 0;
+    int Dbase_ = 0, dCur_ = 0, dPrev_ = 0, xfLeft_ = 0, xfLen_ = 1440;
     int64_t m_ = -1;
-    int H_ = 1, E_ = 0, Qcur_ = -1;
+    int H_ = 1, Qcur_ = -1;
     float dcR_ = 0.999f, dcX1_ = 0.f, dcY1_ = 0.f;
     float gCur_ = 0.f, gate_ = 0.f, gTargetLocal_ = 0.f, gSmooth_ = 0.001f, gateSmooth_ = 0.002f;
     float aFast_ = 0.005f, aSlow_ = 3e-5f, aTrack_ = 0.001f, aStat_ = 2.5e-4f;
@@ -348,6 +410,7 @@ private:
     std::atomic<float> sInDb_{-120.f}, sOutDb_{-120.f}, sPred_{0.f}, sRedDb_{0.f};
     std::atomic<float> sHorizonMs_{0.f}, sGain_{0.f}, sGate_{0.f};
     std::atomic<int> sFeedback_{0};
+    std::atomic<int64_t> mPub_{0};
 };
 
 }  // namespace anc

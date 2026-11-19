@@ -77,9 +77,11 @@ public class AncService extends Service {
         }
         if (ACTION_RESTART.equals(action)) {
             if (running) {
+                if (!enterForeground()) return START_NOT_STICKY;   // Typ (Mikrofon/Wiedergabe) anpassen
                 control.post(() -> {
                     stopEngine();
                     startEngine();
+                    if (!running) shutdown();
                 });
             }
             return START_NOT_STICKY;
@@ -90,20 +92,7 @@ public class AncService extends Service {
             return START_NOT_STICKY;
         }
 
-        createChannel(this);
-        try {
-            if (Build.VERSION.SDK_INT >= 29) {
-                startForeground(NOTIF_ID, buildNotification(this),
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
-            } else {
-                startForeground(NOTIF_ID, buildNotification(this));
-            }
-        } catch (RuntimeException e) {
-            lastError = getString(R.string.err_foreground, String.valueOf(e.getMessage()));
-            running = false;
-            stopSelf();
-            return START_NOT_STICKY;
-        }
+        if (!enterForeground()) return START_NOT_STICKY;
 
         if (!running && !starting) {
             starting = true;
@@ -115,11 +104,33 @@ public class AncService extends Service {
         return START_NOT_STICKY;
     }
 
+    /** Vordergrunddienst mit passendem Typ: Mikrofon nur, wenn ANC an ist. */
+    private boolean enterForeground() {
+        createChannel(this);
+        try {
+            if (Build.VERSION.SDK_INT >= 29) {
+                int type = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK;
+                if (Prefs.anc(this)) type |= ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
+                startForeground(NOTIF_ID, buildNotification(this), type);
+            } else {
+                startForeground(NOTIF_ID, buildNotification(this));
+            }
+            return true;
+        } catch (RuntimeException e) {
+            lastError = getString(R.string.err_foreground, String.valueOf(e.getMessage()));
+            if (!running) stopSelf();
+            return false;
+        }
+    }
+
     /** Läuft im Steuer-Thread. */
     private void startEngine() {
         starting = true;
-        MicRouting route = MicRouting.prepare(this, Prefs.headsetMic(this));
+        final boolean anc = Prefs.anc(this);
+        MicRouting route = anc ? MicRouting.prepare(this, Prefs.headsetMic(this)) : MicRouting.none();
         micNote = route.note;
+        NativeEngine.setFeatures(anc);
+        Prefs.applyNoise(this);
         NativeEngine.setDevices(route.inputId, route.outputId, route.communication);
         NativeEngine.setGain(Prefs.gain(this));
         NativeEngine.setOffsetMs(Prefs.offsetMs(this));
@@ -211,10 +222,23 @@ public class AncService extends Service {
         PendingIntent piStop = PendingIntent.getService(ctx, 1, stop,
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
+        final int title;
+        final String text;
+        boolean anc = Prefs.anc(ctx), noise = Prefs.noise(ctx);
+        if (anc && noise) {
+            title = R.string.notif_title_both;
+            text = ctx.getString(R.string.notif_text_both, Prefs.strength(ctx), Prefs.noiseLevel(ctx));
+        } else if (anc) {
+            title = R.string.notif_title;
+            text = ctx.getString(R.string.notif_text, Prefs.strength(ctx));
+        } else {
+            title = R.string.notif_title_noise;
+            text = ctx.getString(R.string.notif_text_noise, Prefs.noiseLevel(ctx));
+        }
         Notification.Builder b = new Notification.Builder(ctx, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_stat_anc)
-                .setContentTitle(ctx.getString(R.string.notif_title))
-                .setContentText(ctx.getString(R.string.notif_text, Prefs.strength(ctx)))
+                .setContentTitle(ctx.getString(title))
+                .setContentText(text)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setShowWhen(false)

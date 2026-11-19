@@ -46,6 +46,21 @@ public final class NativeEngine {
         nativeSetOffsetMs(ms);
     }
 
+    /** anc=false: nur Rauschen, Mikrofon bleibt aus. Wirkt beim nächsten Start. */
+    public static void setFeatures(boolean anc) {
+        nativeSetFeatures(anc);
+    }
+
+    /** Maskierungsrauschen live ändern. color: 0 = rosa, 1 = braun. */
+    public static void setNoise(boolean on, float rmsLinear, int color) {
+        nativeSetNoise(on, rmsLinear, color);
+    }
+
+    /** Lautester vorhersagbarer Ton in Hz (0 = keiner). Dauert einige ms. */
+    public static float dominantHz() {
+        return nativeGetDominantHz();
+    }
+
     /** Geräte-IDs (0 = Standard); communication = Freisprechmodus (Bluetooth-Mikrofon). */
     public static void setDevices(int inputId, int outputId, boolean communication) {
         nativeSetDevices(inputId, outputId, communication);
@@ -73,6 +88,12 @@ public final class NativeEngine {
     private static native void nativeSetOffsetMs(float ms);
 
     private static native void nativeResetFilter();
+
+    private static native void nativeSetFeatures(boolean anc);
+
+    private static native void nativeSetNoise(boolean on, float rms, int color);
+
+    private static native float nativeGetDominantHz();
 
     private static native void nativeSetDevices(int inputId, int outputId, boolean communication);
 
