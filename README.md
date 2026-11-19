@@ -66,3 +66,7 @@ In der Praxis ist die Wirkung kleiner als in der Simulation, weil das Handy-Mikr
 ## Hinweis zur Signatur
 
 `app/noisecancel.jks` ist ein eigens erzeugter Schlüssel, damit neue Builds als Update installiert werden können. Er ist nur für privates Sideloading gedacht.
+
+### Mikrofon am Ohr (ab v1.0.3)
+
+Mit dem Schalter „Kopfhörer-Mikrofon verwenden“ (Standard: an) wählt die App automatisch das Mikrofon, das am nächsten am Ohr sitzt: Bluetooth-Headset (HFP/SCO bzw. LE Audio) > Kabel-/USB-Headset > Handy. Für Bluetooth-Mikrofone muss Android in den Freisprechmodus schalten (8/16 kHz, Telefonqualität). Der Algorithmus ist dafür ausgelegt (Simulation: −31 dB bei 8 kHz, −32 dB bei 16 kHz). Lässt sich das Headset-Mikrofon nicht aktivieren, fällt die App automatisch auf das Handy-Mikrofon zurück.

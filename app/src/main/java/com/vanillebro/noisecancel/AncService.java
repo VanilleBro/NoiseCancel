@@ -10,6 +10,8 @@ import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.graphics.drawable.Icon;
 import android.os.Build;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.PowerManager;
 
@@ -21,14 +23,19 @@ import android.os.PowerManager;
 public class AncService extends Service {
     public static final String ACTION_START = "com.vanillebro.noisecancel.START";
     public static final String ACTION_STOP = "com.vanillebro.noisecancel.STOP";
+    public static final String ACTION_RESTART = "com.vanillebro.noisecancel.RESTART";
 
     private static final String CHANNEL_ID = "anc_running";
     private static final int NOTIF_ID = 1;
 
     private static volatile boolean running = false;
     private static volatile String lastError = "";
+    private static volatile boolean starting = false;
+    private static volatile String micNote = "";
 
     private PowerManager.WakeLock wakeLock;
+    private HandlerThread controlThread;
+    private Handler control;
 
     public static boolean isRunning() {
         return running;
@@ -36,6 +43,24 @@ public class AncService extends Service {
 
     public static String getLastError() {
         return lastError;
+    }
+
+    public static boolean isStarting() {
+        return starting;
+    }
+
+    public static String getMicNote() {
+        return micNote;
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        // Start/Stopp laufen nacheinander in einem eigenen Thread, weil das Umschalten
+        // auf das Bluetooth-Mikrofon einige Sekunden dauern kann.
+        controlThread = new HandlerThread("anc-control");
+        controlThread.start();
+        control = new Handler(controlThread.getLooper());
     }
 
     @Override
@@ -47,7 +72,16 @@ public class AncService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent != null ? intent.getAction() : null;
         if (ACTION_STOP.equals(action)) {
-            shutdown();
+            control.post(this::shutdown);
+            return START_NOT_STICKY;
+        }
+        if (ACTION_RESTART.equals(action)) {
+            if (running) {
+                control.post(() -> {
+                    stopEngine();
+                    startEngine();
+                });
+            }
             return START_NOT_STICKY;
         }
         if (!ACTION_START.equals(action)) {
@@ -71,20 +105,52 @@ public class AncService extends Service {
             return START_NOT_STICKY;
         }
 
-        if (!running) {
-            NativeEngine.setGain(Prefs.gain(this));
-            NativeEngine.setOffsetMs(Prefs.offsetMs(this));
+        if (!running && !starting) {
+            starting = true;
+            control.post(() -> {
+                startEngine();
+                if (!running) shutdown();
+            });
+        }
+        return START_NOT_STICKY;
+    }
+
+    /** Läuft im Steuer-Thread. */
+    private void startEngine() {
+        starting = true;
+        MicRouting route = MicRouting.prepare(this, Prefs.headsetMic(this));
+        micNote = route.note;
+        NativeEngine.setDevices(route.inputId, route.outputId, route.communication);
+        NativeEngine.setGain(Prefs.gain(this));
+        NativeEngine.setOffsetMs(Prefs.offsetMs(this));
+        if (NativeEngine.start()) {
+            running = true;
+            lastError = "";
+            acquireWakeLock();
+        } else if (route.communication || route.inputId != 0) {
+            // Rückfall auf Standardgeräte
+            MicRouting.release(this);
+            NativeEngine.setDevices(0, 0, false);
+            micNote = getString(R.string.mic_note_bt_failed);
             if (NativeEngine.start()) {
                 running = true;
                 lastError = "";
                 acquireWakeLock();
-            } else {
-                String e = NativeEngine.lastError();
-                lastError = e.isEmpty() ? getString(R.string.err_audio_unknown) : e;
-                shutdown();
             }
         }
-        return START_NOT_STICKY;
+        if (!running) {
+            String e = NativeEngine.lastError();
+            lastError = e.isEmpty() ? getString(R.string.err_audio_unknown) : e;
+            MicRouting.release(this);
+        }
+        starting = false;
+    }
+
+    /** Läuft im Steuer-Thread. */
+    private void stopEngine() {
+        NativeEngine.stop();
+        running = false;
+        MicRouting.release(this);
     }
 
     @Override
@@ -95,17 +161,18 @@ public class AncService extends Service {
 
     @Override
     public void onDestroy() {
-        if (running) {
-            NativeEngine.stop();
-            running = false;
-        }
+        if (running) stopEngine();
+        starting = false;
         releaseWakeLock();
+        if (controlThread != null) controlThread.quitSafely();
         super.onDestroy();
     }
 
+    /** Läuft im Steuer-Thread. */
     private void shutdown() {
-        if (running) NativeEngine.stop();
-        running = false;
+        if (running) stopEngine();
+        else MicRouting.release(this);
+        starting = false;
         releaseWakeLock();
         stopForeground(STOP_FOREGROUND_REMOVE);
         stopSelf();

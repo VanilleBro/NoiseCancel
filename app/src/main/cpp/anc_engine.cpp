@@ -79,9 +79,12 @@ public:
     void setGain(float g) { dsp_.setGain(g); gain_.store(g); }
     void setOffsetMs(float ms) { dsp_.setOffsetSeconds(ms / 1000.f); offsetMs_.store(ms); }
     void resetFilter() { dsp_.requestReset(); }
+    void setDevices(int inId, int outId, bool comm) {
+        wantIn_.store(inId); wantOut_.store(outId); comm_.store(comm);
+    }
 
     void getStats(float* o, int n) {
-        float v[16] = {0};
+        float v[20] = {0};
         v[0] = running_.load() ? 1.f : 0.f;
         v[1] = (float)sampleRate_.load();
         v[2] = latencyMs_.load();
@@ -98,7 +101,10 @@ public:
         v[13] = restarting_.load() ? 1.f : 0.f;
         v[14] = dsp_.statConfGate();
         v[15] = lowLatency_.load() ? 1.f : 0.f;
-        for (int i = 0; i < n && i < 16; ++i) o[i] = v[i];
+        v[16] = (float)actualIn_.load();
+        v[17] = (float)actualOut_.load();
+        v[18] = comm_.load() ? 1.f : 0.f;
+        for (int i = 0; i < n && i < 20; ++i) o[i] = v[i];
     }
 
     std::string lastError() {
@@ -114,7 +120,7 @@ private:
     }
 
     AAudioStream* openOne(aaudio_direction_t dir, int rate, int channels, aaudio_input_preset_t preset,
-                          bool withCallback, aaudio_result_t* resOut) {
+                          bool withCallback, int deviceId, aaudio_result_t* resOut) {
         AAudioStreamBuilder* b = nullptr;
         aaudio_result_t r = AAudio_createStreamBuilder(&b);
         if (r != AAUDIO_OK) { *resOut = r; return nullptr; }
@@ -124,8 +130,14 @@ private:
         AAudioStreamBuilder_setFormat(b, AAUDIO_FORMAT_PCM_FLOAT);
         AAudioStreamBuilder_setChannelCount(b, channels);
         if (rate > 0) AAudioStreamBuilder_setSampleRate(b, rate);
+        if (deviceId > 0) AAudioStreamBuilder_setDeviceId(b, deviceId);
+        const bool comm = comm_.load();
         if (dir == AAUDIO_DIRECTION_INPUT) {
             AAudioStreamBuilder_setInputPreset(b, preset);
+        } else if (comm) {
+            // Freisprechmodus: Ausgabe muss über die Bluetooth-Sprachverbindung laufen
+            AAudioStreamBuilder_setUsage(b, AAUDIO_USAGE_VOICE_COMMUNICATION);
+            AAudioStreamBuilder_setContentType(b, AAUDIO_CONTENT_TYPE_SPEECH);
         } else {
             AAudioStreamBuilder_setUsage(b, AAUDIO_USAGE_GAME);
             AAudioStreamBuilder_setContentType(b, AAUDIO_CONTENT_TYPE_MUSIC);
@@ -147,7 +159,11 @@ private:
         closeStreams();
         aaudio_result_t r = AAUDIO_OK;
 
-        out_ = openOne(AAUDIO_DIRECTION_OUTPUT, 0, 2, AAUDIO_INPUT_PRESET_GENERIC, true, &r);
+        const int wantOut = wantOut_.load(), wantIn = wantIn_.load();
+        const bool comm = comm_.load();
+        out_ = openOne(AAUDIO_DIRECTION_OUTPUT, 0, comm ? 1 : 2, AAUDIO_INPUT_PRESET_GENERIC, true, wantOut, &r);
+        if (!out_ && wantOut > 0)   // Gerät verschwunden -> Standardausgabe
+            out_ = openOne(AAUDIO_DIRECTION_OUTPUT, 0, comm ? 1 : 2, AAUDIO_INPUT_PRESET_GENERIC, true, 0, &r);
         if (!out_) {
             setError(std::string("Audioausgabe konnte nicht geöffnet werden: ") + AAudio_convertResultToText(r));
             return false;
@@ -160,15 +176,23 @@ private:
         AAudioStream_setBufferSizeInFrames(out_, burst * 2);
         outBufferFrames_.store(AAudioStream_getBufferSizeInFrames(out_));
 
-        const aaudio_input_preset_t presets[] = {AAUDIO_INPUT_PRESET_UNPROCESSED,
-                                                 AAUDIO_INPUT_PRESET_VOICE_RECOGNITION,
-                                                 AAUDIO_INPUT_PRESET_GENERIC};
-        for (aaudio_input_preset_t p : presets) {
-            in_ = openOne(AAUDIO_DIRECTION_INPUT, rate, 1, p, false, &r);
-            if (in_) {
-                if (AAudioStream_getSampleRate(in_) == rate) break;
-                stopAndClose(in_);
-                r = AAUDIO_ERROR_INVALID_RATE;
+        const aaudio_input_preset_t presetsNormal[] = {AAUDIO_INPUT_PRESET_UNPROCESSED,
+                                                       AAUDIO_INPUT_PRESET_VOICE_RECOGNITION,
+                                                       AAUDIO_INPUT_PRESET_GENERIC};
+        const aaudio_input_preset_t presetsComm[] = {AAUDIO_INPUT_PRESET_VOICE_RECOGNITION,
+                                                     AAUDIO_INPUT_PRESET_VOICE_COMMUNICATION,
+                                                     AAUDIO_INPUT_PRESET_GENERIC};
+        const aaudio_input_preset_t* presets = comm ? presetsComm : presetsNormal;
+        for (int pass = 0; pass < 2 && !in_; ++pass) {
+            const int dev = pass == 0 ? wantIn : 0;
+            if (pass == 1 && wantIn <= 0) break;
+            for (int k = 0; k < 3; ++k) {
+                in_ = openOne(AAUDIO_DIRECTION_INPUT, rate, 1, presets[k], false, dev, &r);
+                if (in_) {
+                    if (AAudioStream_getSampleRate(in_) == rate) break;
+                    stopAndClose(in_);
+                    r = AAUDIO_ERROR_INVALID_RATE;
+                }
             }
         }
         if (!in_) {
@@ -191,6 +215,8 @@ private:
         lowLatency_.store(AAudioStream_getPerformanceMode(out_) == AAUDIO_PERFORMANCE_MODE_LOW_LATENCY &&
                           AAudioStream_getPerformanceMode(in_) == AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
         sampleRate_.store(rate);
+        actualIn_.store(AAudioStream_getDeviceId(in_));
+        actualOut_.store(AAudioStream_getDeviceId(out_));
 
         inF_.assign((size_t)kMaxFrames * std::max(1, inChannels_), 0.f);
         inI_.assign((size_t)kMaxFrames * std::max(1, inChannels_), 0);
@@ -418,6 +444,8 @@ private:
     std::atomic<float> latencyMs_{0.f}, gain_{1.f}, offsetMs_{0.f};
     std::atomic<int64_t> frameOffset_{kInvalid};
     std::atomic<int> underruns_{0}, xruns_{0};
+    std::atomic<int> wantIn_{0}, wantOut_{0}, actualIn_{0}, actualOut_{0};
+    std::atomic<bool> comm_{false};
 
     int outChannels_ = 2, inChannels_ = 1, outBurst_ = 192, inBurst_ = 192;
     aaudio_format_t outFormat_ = AAUDIO_FORMAT_PCM_FLOAT, inFormat_ = AAUDIO_FORMAT_PCM_FLOAT;
@@ -459,6 +487,12 @@ Java_com_vanillebro_noisecancel_NativeEngine_nativeSetOffsetMs(JNIEnv*, jclass, 
 }
 
 JNIEXPORT void JNICALL
+Java_com_vanillebro_noisecancel_NativeEngine_nativeSetDevices(JNIEnv*, jclass, jint inId, jint outId,
+                                                              jboolean comm) {
+    engine().setDevices(inId, outId, comm == JNI_TRUE);
+}
+
+JNIEXPORT void JNICALL
 Java_com_vanillebro_noisecancel_NativeEngine_nativeResetFilter(JNIEnv*, jclass) {
     engine().resetFilter();
 }
@@ -467,9 +501,9 @@ JNIEXPORT void JNICALL
 Java_com_vanillebro_noisecancel_NativeEngine_nativeGetStats(JNIEnv* env, jclass, jfloatArray arr) {
     if (!arr) return;
     const jsize n = env->GetArrayLength(arr);
-    float tmp[16] = {0};
-    engine().getStats(tmp, 16);
-    env->SetFloatArrayRegion(arr, 0, std::min<jsize>(n, 16), tmp);
+    float tmp[20] = {0};
+    engine().getStats(tmp, 20);
+    env->SetFloatArrayRegion(arr, 0, std::min<jsize>(n, 20), tmp);
 }
 
 JNIEXPORT jstring JNICALL

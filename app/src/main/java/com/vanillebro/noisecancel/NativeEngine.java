@@ -23,7 +23,9 @@ public final class NativeEngine {
     public static final int S_RESTARTING = 13;
     public static final int S_CONF_GATE = 14;
     public static final int S_LOW_LATENCY = 15;
-    public static final int STATS_SIZE = 16;
+    public static final int S_INPUT_DEVICE = 16;
+    public static final int S_OUTPUT_DEVICE = 17;
+    public static final int STATS_SIZE = 20;
 
     private NativeEngine() {
     }
@@ -42,6 +44,11 @@ public final class NativeEngine {
 
     public static void setOffsetMs(float ms) {
         nativeSetOffsetMs(ms);
+    }
+
+    /** Geräte-IDs (0 = Standard); communication = Freisprechmodus (Bluetooth-Mikrofon). */
+    public static void setDevices(int inputId, int outputId, boolean communication) {
+        nativeSetDevices(inputId, outputId, communication);
     }
 
     public static void resetFilter() {
@@ -66,6 +73,8 @@ public final class NativeEngine {
     private static native void nativeSetOffsetMs(float ms);
 
     private static native void nativeResetFilter();
+
+    private static native void nativeSetDevices(int inputId, int outputId, boolean communication);
 
     private static native void nativeGetStats(float[] out);
 

@@ -8,6 +8,7 @@ final class Prefs {
     private static final String NAME = "anc_prefs";
     private static final String KEY_STRENGTH = "strength";
     private static final String KEY_OFFSET = "offset";
+    private static final String KEY_HEADSET_MIC = "headset_mic";
 
     static final int STRENGTH_MAX = 100;
     static final int STRENGTH_DEFAULT = 40;     // = 0 dB (Gegenschall gleich laut wie Mikrofonsignal)
@@ -35,6 +36,14 @@ final class Prefs {
 
     static void setOffsetProgress(Context c, int v) {
         p(c).edit().putInt(KEY_OFFSET, v).apply();
+    }
+
+    static boolean headsetMic(Context c) {
+        return p(c).getBoolean(KEY_HEADSET_MIC, true);
+    }
+
+    static void setHeadsetMic(Context c, boolean v) {
+        p(c).edit().putBoolean(KEY_HEADSET_MIC, v).apply();
     }
 
     static float offsetMsForProgress(int progress) {

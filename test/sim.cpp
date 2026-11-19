@@ -14,10 +14,11 @@ struct Case {
     bool tones;
     double noiseAmp;
     double drift;        // langsame Frequenzdrift (Hz)
+    int fs = 48000;      // Abtastrate
 };
 
 static double run(const Case& c, double* inDb, double* outDb, float* pred) {
-    const int fs = 48000;
+    const int fs = c.fs;
     const int D = (int)std::lround(c.delayMs * fs / 1000.0);
     anc::AncDsp dsp;
     dsp.init(fs);
@@ -150,6 +151,8 @@ int main() {
         {"Toene, 25 ms, Frequenzdrift 0.5 Hz", 25, 0, 0, true, 0.002, 0.5},
         {"Nur Rauschen (darf nicht lauter werden)", 25, 0, 0, false, 0.02, 0},
         {"Lautsprecher, Rueckkopplung 150 %", 25, 0, 1.5, true, 0.002, 0},
+        {"BT-Headset-Mikro (16 kHz), 60 ms", 60, 0, 0, true, 0.002, 0, 16000},
+        {"BT-Headset-Mikro (8 kHz), 60 ms", 60, 0, 0, true, 0.002, 0, 8000},
     };
     for (const auto& c : cases) {
         double inDb, outDb; float pred;

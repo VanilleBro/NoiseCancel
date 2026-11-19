@@ -67,6 +67,27 @@
             android:textColor="@color/muted"
             android:textSize="13sp" />
 
+        <!-- Mikrofon -->
+        <LinearLayout style="@style/Card">
+
+            <Switch
+                android:id="@+id/swHeadsetMic"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:text="@string/mic_switch"
+                android:textColor="@color/text"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:thumbTint="@color/accent"
+                android:trackTint="@color/track" />
+
+            <TextView
+                android:id="@+id/tvMic"
+                style="@style/Hint"
+                android:text="@string/mic_hint" />
+        </LinearLayout>
+
         <!-- Stärke -->
         <LinearLayout style="@style/Card">
 

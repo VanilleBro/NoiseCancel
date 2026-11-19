@@ -18,6 +18,19 @@
     <string name="route_bt">Bluetooth-Kopfhörer: hohe Funk-Latenz. Wirkt nur bei sehr gleichmäßigen Tönen – Kabel ist deutlich besser.</string>
     <string name="route_speaker">Kein Kopfhörer: Über den Lautsprecher wirkt Gegenschall nur an einem Punkt im Raum und kann rückkoppeln. Bitte Kopfhörer anschließen.</string>
 
+    <string name="mic_switch">Kopfhörer-Mikrofon verwenden</string>
+    <string name="mic_hint">Nutzt automatisch das Mikrofon direkt am Ohr: Bluetooth-Headset, sonst Kabel-/USB-Headset, sonst Handy. Bei Bluetooth schaltet Android dafür in den Freisprechmodus (Telefonqualität, etwas mehr Latenz).</string>
+    <string name="mic_active">Aktives Mikrofon: %1$s</string>
+    <string name="mic_default">Standard</string>
+    <string name="mic_phone">Handy-Mikrofon</string>
+    <string name="mic_wired">Kabel-Headset</string>
+    <string name="mic_usb">USB-Headset</string>
+    <string name="mic_bt">Bluetooth-Headset</string>
+    <string name="mic_note_wired">Kabelmikrofon erkannt und aktiviert.</string>
+    <string name="mic_note_bt">Bluetooth-Freisprechmodus aktiv. Manche Headsets filtern Umgebungsgeräusche selbst heraus – dann hört die App weniger davon.</string>
+    <string name="mic_note_bt_failed">Bluetooth-Mikrofon ließ sich nicht aktivieren – nutze Handy-Mikrofon.</string>
+    <string name="state_starting">Startet … (Mikrofon wird verbunden)</string>
+
     <string name="gain_title">Stärke</string>
     <string name="gain_off">Aus</string>
     <string name="gain_value">%1$d %% · %2$+.1f dB</string>

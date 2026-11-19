@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.widget.ProgressBar;
 import android.widget.SeekBar;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -26,6 +27,8 @@ public class MainActivity extends Activity {
     private TextView tvInput, tvPred, tvRed, tvLatency, tvPath, tvOut, tvEvents, tvGate;
     private SeekBar sbGain, sbOffset;
     private ProgressBar pbPred;
+    private Switch swHeadsetMic;
+    private TextView tvMic;
     private AudioManager audioManager;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -63,6 +66,15 @@ public class MainActivity extends Activity {
         sbGain = findViewById(R.id.sbGain);
         sbOffset = findViewById(R.id.sbOffset);
         pbPred = findViewById(R.id.pbPred);
+        swHeadsetMic = findViewById(R.id.swHeadsetMic);
+        tvMic = findViewById(R.id.tvMic);
+        swHeadsetMic.setChecked(Prefs.headsetMic(this));
+        swHeadsetMic.setOnCheckedChangeListener((b, checked) -> {
+            Prefs.setHeadsetMic(this, checked);
+            if (AncService.isRunning()) {
+                startService(new Intent(this, AncService.class).setAction(AncService.ACTION_RESTART));
+            }
+        });
 
         sbGain.setMax(Prefs.STRENGTH_MAX);
         sbGain.setProgress(Prefs.strength(this));
@@ -184,8 +196,20 @@ public class MainActivity extends Activity {
             lastShownRunning = running;
         }
 
+        // Mikrofon
+        if (running) {
+            String mic = getString(R.string.mic_active,
+                    MicRouting.describeInput(this, Math.round(stats[NativeEngine.S_INPUT_DEVICE])));
+            String note = AncService.getMicNote();
+            tvMic.setText(note.isEmpty() ? mic : mic + "\n" + note);
+        } else {
+            tvMic.setText(R.string.mic_hint);
+        }
+
         // Status
-        if (!running) {
+        if (AncService.isStarting()) {
+            tvState.setText(R.string.state_starting);
+        } else if (!running) {
             String err = AncService.getLastError();
             tvState.setText(err.isEmpty() ? getString(R.string.state_off) : getString(R.string.state_error, err));
         } else if (stats[NativeEngine.S_RESTARTING] > 0.5f) {

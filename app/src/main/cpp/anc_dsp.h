@@ -51,7 +51,7 @@ public:
 
     // Nur aufrufen, wenn kein Audio-Thread process() ausführt.
     void init(int sampleRate) {
-        fs_ = sampleRate > 8000 ? sampleRate : 48000;
+        fs_ = sampleRate >= 8000 ? sampleRate : 48000;   // 8/16 kHz bei Bluetooth-Freisprechen
         R_ = std::max(1, (int)std::lround(fs_ / kTargetDecRate));
         if (R_ > 90) R_ = 90;
         fsd_ = (double)fs_ / R_;
